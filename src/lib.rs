@@ -1,5 +1,3 @@
-extern crate toml;
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenType {
     Punctuation,
@@ -245,15 +243,6 @@ pub fn tokenise(s: &str) {
         tokens.push(next_token);
         remainder = rem;
     }
-}
-
-#[test]
-fn it_works() {
-    use toml::Value;
-    let tv = Value::String("Hello".to_string());
-    assert_eq!(tv.to_string(), "\"Hello\"");
-    let tv2 = Value::Integer(123);
-    assert_eq!(tv2.to_string(), "123");
 }
 
 #[test]
