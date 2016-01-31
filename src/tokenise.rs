@@ -17,8 +17,8 @@ pub enum TokenType {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Token {
-    kind: TokenType,
-    text: String,
+    pub kind: TokenType,
+    pub text: String,
 }
 
 macro_rules! chars_while {
