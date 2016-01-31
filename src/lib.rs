@@ -99,6 +99,66 @@ fn read_bare_key(s: &str) -> (Token, &str) {
     (Token{kind: TokenType::BareKey, text:String::from(tok)}, remainder)
 }
 
+fn read_literal_string(s: &str) -> (Token, &str) {
+    let mut ends_at = s.len();
+    let (offset, kind) = if s.starts_with("'''") {
+        (3, TokenType::MultilineLiteralString)
+    } else {
+        (1, TokenType::LiteralString)
+    };
+    for (i, c) in s[offset..].char_indices() {
+        match c {
+            '\'' => {
+                if kind == TokenType::MultilineLiteralString {
+                    if s[i+offset..].starts_with("'''") {
+                        ends_at = i+6; // +6 for 2x triple quotes
+                        break;
+                    }
+                } else {
+                    ends_at = i+2; // +2 for 2x single quotes
+                    break;
+                }
+            },
+            _ => ()
+        }
+    }
+    let (tok,  remainder) = s.split_at(ends_at);
+    (Token{kind: kind, text: String::from(tok)}, remainder)
+}
+
+fn read_basic_string(s: &str) -> (Token, &str) {
+    let mut ends_at = s.len();
+    let (offset, kind) = if s.starts_with("\"\"\"") {
+        (3, TokenType::MultilineBasicString)
+    } else {
+        (1, TokenType::BasicString)
+    };
+    let mut escape = false;
+    for (i, c) in s[offset..].char_indices() {
+        match c {
+            '\\' => escape = !escape,
+            '"' => {
+                if escape {
+                    escape = false;
+                    continue;
+                }
+                if kind == TokenType::MultilineBasicString {
+                    if s[i+offset..].starts_with("\"\"\"") {
+                        ends_at = i+6; // +6 for 2x triple quotes
+                        break;
+                    }
+                } else {
+                    ends_at = i+2; // +2 for 2x single quotes
+                    break;
+                }
+            },
+            _ => escape = false
+        }
+    }
+    let (tok,  remainder) = s.split_at(ends_at);
+    (Token{kind: kind, text: String::from(tok)}, remainder)
+}
+
 fn key_context(in_rhs: bool, bracket_stack: &Vec<char>, tokens: &Vec<Token>) -> bool {
     if in_rhs {
         if bracket_stack.last() == Some(&'{') {
@@ -175,7 +235,9 @@ pub fn tokenise(s: &str) {
                 'A'...'Z'|'a'...'z'|'_' => {
                     assert!(key_context(in_rhs, &bracket_stack, &tokens));
                     read_bare_key(remainder)
-                }
+                },
+                '\'' => read_literal_string(remainder),
+                '"' => read_basic_string(remainder),
                 _ => panic!("Unexpected char")
 
             }}
@@ -234,6 +296,22 @@ fn test_read_bare_key() {
             (Token{kind: TokenType::BareKey, text: String::from("bare-key")}, " ="));
     assert_eq!(read_bare_key("1234="),
             (Token{kind: TokenType::BareKey, text: String::from("1234")}, "="));
+}
+
+#[test]
+fn test_read_literal_string() {
+    assert_eq!(read_literal_string("'foo' "),
+            (Token{kind: TokenType::LiteralString, text: String::from("'foo'")}, " "));
+    assert_eq!(read_literal_string("'''foo'\nbar''' "),
+            (Token{kind: TokenType::MultilineLiteralString, text: String::from("'''foo'\nbar'''")}, " "));
+}
+
+#[test]
+fn test_read_basic_string() {
+    assert_eq!(read_basic_string(r#""foo\"\nbar" "#),
+            (Token{kind: TokenType::BasicString, text: String::from(r#""foo\"\nbar""#)}, " "));
+    assert_eq!(read_basic_string(r#""""foo"\nbar\"""" "#),
+            (Token{kind: TokenType::MultilineBasicString, text: String::from(r#""""foo"\nbar\"""""#)}, " "));
 }
 
 // #[test]
