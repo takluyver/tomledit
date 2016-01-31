@@ -182,7 +182,7 @@ fn key_context(in_rhs: bool, bracket_stack: &Vec<char>, tokens: &Vec<Token>) -> 
     }
 }
 
-pub fn tokenise(s: &str) {
+pub fn tokenise(s: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut remainder = s;
     let mut in_rhs = false;
@@ -243,6 +243,7 @@ pub fn tokenise(s: &str) {
         tokens.push(next_token);
         remainder = rem;
     }
+    tokens
 }
 
 #[test]
