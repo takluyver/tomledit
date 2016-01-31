@@ -2,7 +2,7 @@ extern crate toml;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TokenType {
-    Punctutation,
+    Punctuation,
     Whitespace,
     Newline,
     Comment,
@@ -57,17 +57,36 @@ macro_rules! chars_until {
 
 fn read_whitespace(s: &str) -> (Token, &str) {
     let (tok, remainder) = chars_while!(s, ' ', '\t');
-    return (Token{kind: TokenType::Whitespace, text:String::from(tok)}, remainder)
+    (Token{kind: TokenType::Whitespace, text:String::from(tok)}, remainder)
 }
 
 fn read_newline(s: &str) -> (Token, &str) {
     let (tok, remainder) = chars_while!(s, '\n', '\r');
-    return (Token{kind: TokenType::Newline, text:String::from(tok)}, remainder)
+    (Token{kind: TokenType::Newline, text:String::from(tok)}, remainder)
 }
 
 fn read_comment(s: &str) -> (Token, &str) {
     let (tok, remainder) = chars_until!(s, '\n', '\r');
-    return (Token{kind: TokenType::Comment, text:String::from(tok)}, remainder)
+    (Token{kind: TokenType::Comment, text:String::from(tok)}, remainder)
+}
+
+fn read_punctuation(s: &str) -> (Token, &str) {
+    // Punctuation is always 1 character (and 1 byte in UTF-8)
+    (Token{kind: TokenType::Punctuation, text:String::from(&s[..1])}, &s[1..])
+}
+
+fn read_number_or_datetime(s: &str) -> (Token, &str) {
+    let (tok,  remainder) = chars_until!(s, ' ', '\t', '\n', '\r');
+    let kind  = if tok.contains('e') || tok.contains('E') {
+        TokenType::Float
+    } else if tok.contains('-') && !tok.starts_with('-') {
+        TokenType::Datetime
+    } else if tok.contains('.') {
+        TokenType::Float
+    } else {
+        TokenType::Integer
+    };
+    (Token{kind: kind, text:String::from(tok)}, remainder)
 }
 
 pub fn tokenise(s: &str) {
@@ -81,6 +100,8 @@ pub fn tokenise(s: &str) {
                 ' '|'\t' => read_whitespace(remainder),
                 '\n'|'\r' => read_newline(remainder),
                 '#' => read_comment(remainder),
+                '['|']'|'.'|','|'=' => read_punctuation(remainder),
+                '+'|'-' => read_number_or_datetime(remainder),
                 _ => panic!("Unexpected char")
             }}
         };
@@ -114,6 +135,22 @@ fn test_read_newline() {
 fn test_read_comment() {
     assert_eq!(read_comment("# This is a comment\nfoo"),
             (Token{kind: TokenType::Comment, text: String::from("# This is a comment")}, "\nfoo"))
+}
+
+#[test]
+fn test_read_punctuation() {
+    assert_eq!(read_punctuation("[foo]"),
+            (Token{kind: TokenType::Punctuation, text: String::from("[")}, "foo]"));
+}
+
+#[test]
+fn test_read_number_or_datetime() {
+    assert_eq!(read_number_or_datetime("6.626e-34 "),
+            (Token{kind: TokenType::Float, text: String::from("6.626e-34")}, " "));
+    assert_eq!(read_number_or_datetime("-12\n"),
+            (Token{kind: TokenType::Integer, text: String::from("-12")}, "\n"));
+    assert_eq!(read_number_or_datetime("1979-05-27 "),
+            (Token{kind: TokenType::Datetime, text: String::from("1979-05-27")}, " "));
 }
 
 // #[test]
