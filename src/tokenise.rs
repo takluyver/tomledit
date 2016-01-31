@@ -68,13 +68,13 @@ fn read_comment(s: &str) -> (Token, &str) {
     (Token{kind: TokenType::Comment, text:String::from(tok)}, remainder)
 }
 
-fn read_punctuation(s: &str) -> (Token, &str) {
+pub fn read_punctuation(s: &str) -> (Token, &str) {
     // Punctuation is always 1 character (and 1 byte in UTF-8)
     (Token{kind: TokenType::Punctuation, text:String::from(&s[..1])}, &s[1..])
 }
 
-fn read_number_or_datetime(s: &str) -> (Token, &str) {
-    let (tok,  remainder) = chars_until!(s, ' ', '\t', '\n', '\r', '#');
+pub fn read_number_or_datetime(s: &str) -> (Token, &str) {
+    let (tok,  remainder) = chars_until!(s, ' ', '\t', '\n', '\r', '#', ']', '}');
     let kind  = if tok.contains('e') || tok.contains('E') {
         TokenType::Float
     } else if tok.contains('-') && !tok.starts_with('-') {
@@ -92,12 +92,12 @@ fn read_boolean(s: &str) -> (Token, &str) {
     (Token{kind: TokenType::Boolean, text:String::from(tok)}, remainder)
 }
 
-fn read_bare_key(s: &str) -> (Token, &str) {
+pub fn read_bare_key(s: &str) -> (Token, &str) {
     let (tok, remainder) = chars_while!(s, 'A'...'Z', 'a'...'z', '0'...'9', '_', '-');
     (Token{kind: TokenType::BareKey, text:String::from(tok)}, remainder)
 }
 
-fn read_literal_string(s: &str) -> (Token, &str) {
+pub fn read_literal_string(s: &str) -> (Token, &str) {
     let mut ends_at = s.len();
     let (offset, kind) = if s.starts_with("'''") {
         (3, TokenType::MultilineLiteralString)
@@ -124,7 +124,7 @@ fn read_literal_string(s: &str) -> (Token, &str) {
     (Token{kind: kind, text: String::from(tok)}, remainder)
 }
 
-fn read_basic_string(s: &str) -> (Token, &str) {
+pub fn read_basic_string(s: &str) -> (Token, &str) {
     let mut ends_at = s.len();
     let (offset, kind) = if s.starts_with("\"\"\"") {
         (3, TokenType::MultilineBasicString)
