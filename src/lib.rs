@@ -76,7 +76,7 @@ fn read_punctuation(s: &str) -> (Token, &str) {
 }
 
 fn read_number_or_datetime(s: &str) -> (Token, &str) {
-    let (tok,  remainder) = chars_until!(s, ' ', '\t', '\n', '\r');
+    let (tok,  remainder) = chars_until!(s, ' ', '\t', '\n', '\r', '#');
     let kind  = if tok.contains('e') || tok.contains('E') {
         TokenType::Float
     } else if tok.contains('-') && !tok.starts_with('-') {
@@ -89,20 +89,95 @@ fn read_number_or_datetime(s: &str) -> (Token, &str) {
     (Token{kind: kind, text:String::from(tok)}, remainder)
 }
 
+fn read_boolean(s: &str) -> (Token, &str) {
+    let (tok,  remainder) = chars_until!(s, ' ', '\t', '\n', '\r', '#');
+    (Token{kind: TokenType::Boolean, text:String::from(tok)}, remainder)
+}
+
+fn read_bare_key(s: &str) -> (Token, &str) {
+    let (tok, remainder) = chars_while!(s, 'A'...'Z', 'a'...'z', '0'...'9', '_', '-');
+    (Token{kind: TokenType::BareKey, text:String::from(tok)}, remainder)
+}
+
+fn key_context(in_rhs: bool, bracket_stack: &Vec<char>, tokens: &Vec<Token>) -> bool {
+    if in_rhs {
+        if bracket_stack.last() == Some(&'{') {
+            for token in tokens.iter().rev() {
+                match token.kind {
+                    TokenType::Whitespace => continue,
+                    TokenType::Punctuation => {
+                        if token.text == "," || token.text == "{" {
+                            return true
+                        } else {
+                            return false
+                        }
+                    },
+                    _ => {return false}
+                }
+            }
+            panic!()
+        } else {
+            false
+        }
+    } else {
+        true
+    }
+}
+
 pub fn tokenise(s: &str) {
     let mut tokens = Vec::new();
     let mut remainder = s;
+    let mut in_rhs = false;
+    let mut bracket_stack = Vec::new();
     loop {
         let next_char = remainder.chars().next();
         let (next_token, rem) = match next_char {
             None => {break;},
             Some(c) => {match c {
                 ' '|'\t' => read_whitespace(remainder),
-                '\n'|'\r' => read_newline(remainder),
+                '\n'|'\r' => {
+                    if bracket_stack.is_empty() {
+                        in_rhs = false;
+                    }
+                    read_newline(remainder)
+                },
                 '#' => read_comment(remainder),
-                '['|']'|'.'|','|'=' => read_punctuation(remainder),
-                '+'|'-' => read_number_or_datetime(remainder),
+                '['|'{' => {
+                    bracket_stack.push(c);
+                    read_punctuation(remainder)
+                },
+                ']'|'}' => {
+                    bracket_stack.pop().unwrap();
+                    read_punctuation(remainder)
+                },
+                '=' => {
+                    in_rhs = true;
+                    read_punctuation(remainder)
+                }
+                '.'|',' => {
+                    read_punctuation(remainder)
+                },
+                '+' => read_number_or_datetime(remainder),
+                '0'...'9'|'-' => {
+                    if key_context(in_rhs, &bracket_stack, &tokens) {
+                        read_bare_key(remainder)
+                    } else {
+                        read_number_or_datetime(remainder)
+                    }
+                },
+                't'|'f' => {
+                    if key_context(in_rhs, &bracket_stack, &tokens) {
+                        read_bare_key(remainder)
+                    } else {
+                        read_boolean(remainder)
+                    }
+                },
+                'A'...'Z'|'a'...'z'|'_' => {
+                    assert!(key_context(in_rhs, &bracket_stack, &tokens));
+                    read_bare_key(remainder)
+                }
                 _ => panic!("Unexpected char")
+
             }}
         };
         tokens.push(next_token);
@@ -151,6 +226,14 @@ fn test_read_number_or_datetime() {
             (Token{kind: TokenType::Integer, text: String::from("-12")}, "\n"));
     assert_eq!(read_number_or_datetime("1979-05-27 "),
             (Token{kind: TokenType::Datetime, text: String::from("1979-05-27")}, " "));
+}
+
+#[test]
+fn test_read_bare_key() {
+    assert_eq!(read_bare_key("bare-key ="),
+            (Token{kind: TokenType::BareKey, text: String::from("bare-key")}, " ="));
+    assert_eq!(read_bare_key("1234="),
+            (Token{kind: TokenType::BareKey, text: String::from("1234")}, "="));
 }
 
 // #[test]
