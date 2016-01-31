@@ -4,6 +4,7 @@ extern crate toml;
 pub enum TokenType {
     Punctutation,
     Whitespace,
+    Newline,
     Comment,
     BareKey,
     BasicString,
@@ -22,34 +23,50 @@ pub struct Token {
     text: String,
 }
 
-pub fn read_whitespace(s: &str) -> (Token, &str) {
-    let mut ends_at = s.len();
-    for (i, c) in s.char_indices() {
-        match c {
-            ' '|'\t' => (),
-            _ => {
-                ends_at = i;
-                break;
+macro_rules! chars_while {
+    ($s:expr, $($pattern:pat),+ ) => {{
+        let mut ends_at = $s.len();
+        for (i, c) in $s.char_indices() {
+            match c {
+                $($pattern)|+ => (),
+                _ => {
+                    ends_at = i;
+                    break;
+                }
             }
         }
-    }
-    let (tok, remainder) = s.split_at(ends_at);
+        $s.split_at(ends_at)
+    }}
+}
+
+macro_rules! chars_until {
+    ($s:expr, $($pattern:pat),+ ) => {{
+        let mut ends_at = $s.len();
+        for (i, c) in $s.char_indices() {
+            match c {
+                $($pattern)|+ => {
+                    ends_at = i;
+                    break;
+                },
+                _ => ()
+            }
+        }
+        $s.split_at(ends_at)
+    }}
+}
+
+fn read_whitespace(s: &str) -> (Token, &str) {
+    let (tok, remainder) = chars_while!(s, ' ', '\t');
     return (Token{kind: TokenType::Whitespace, text:String::from(tok)}, remainder)
 }
 
-pub fn read_comment(s: &str) -> (Token, &str) {
-    let mut ends_at = s.len();
-    let mut tok = String::new();
-    for (i, c) in s.char_indices() {
-        match c {
-            '\n'|'\r' => {
-                ends_at = i;
-                break;
-            }
-            _ => tok.push(c),
-        }
-    }
-    let (tok, remainder) = s.split_at(ends_at);
+fn read_newline(s: &str) -> (Token, &str) {
+    let (tok, remainder) = chars_while!(s, '\n', '\r');
+    return (Token{kind: TokenType::Newline, text:String::from(tok)}, remainder)
+}
+
+fn read_comment(s: &str) -> (Token, &str) {
+    let (tok, remainder) = chars_until!(s, '\n', '\r');
     return (Token{kind: TokenType::Comment, text:String::from(tok)}, remainder)
 }
 
@@ -61,8 +78,9 @@ pub fn tokenise(s: &str) {
         let (next_token, rem) = match next_char {
             None => {break;},
             Some(c) => {match c {
-                ' '|'\t' => read_whitespace(s),
-                '#' => read_comment(s),
+                ' '|'\t' => read_whitespace(remainder),
+                '\n'|'\r' => read_newline(remainder),
+                '#' => read_comment(remainder),
                 _ => panic!("Unexpected char")
             }}
         };
@@ -84,6 +102,12 @@ fn it_works() {
 fn test_read_whitespace() {
     let res = read_whitespace("  \t b");
     assert_eq!(res, (Token{kind: TokenType::Whitespace, text: String::from("  \t ")}, "b"))
+}
+
+#[test]
+fn test_read_newline() {
+    let res = read_newline("\n\r\na");
+    assert_eq!(res, (Token{kind: TokenType::Newline, text: String::from("\n\r\n")}, "a"))
 }
 
 #[test]
