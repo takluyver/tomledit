@@ -9,11 +9,11 @@ pub enum KeyPath {
 }
 
 impl KeyPath {
-    fn append_key(self, k: String) -> KeyPath {
+    pub fn append_key(self, k: String) -> KeyPath {
         KeyPath::Key(Box::new(self.clone()), k)
     }
 
-    fn append_index(self, i: i64) -> KeyPath {
+    pub fn append_index(self, i: i64) -> KeyPath {
         KeyPath::Ix(Box::new(self.clone()), i)
     }
 
