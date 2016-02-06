@@ -21,6 +21,34 @@ pub struct Token {
     pub text: String,
 }
 
+impl Token {
+    pub fn from(s: &str) -> Token {
+        use TokenType::*;
+        if s == "" {
+            panic!("Token::from got empty string")
+        }
+        let kind = if s.starts_with(r#"""""#) {
+            MultilineBasicString
+        } else if s.starts_with("'''") {
+            MultilineLiteralString
+        } else if s == "true" || s == "false" {
+            Boolean
+        } else {
+            match s.chars().next().unwrap() {
+                ' ' | '\t' => Whitespace,
+                '\n' | '\r' => Newline,
+                '#' => Comment,
+                '"' => BasicString,
+                '\'' => LiteralString,
+                '-' | '+' | '0'...'9' => get_number_or_datetime_kind(s),
+                '[' | ']' | '{' | '}' | '=' | '.' | ',' => Punctuation,
+                _ => BareKey,
+            }
+        };
+        Token{kind: kind, text: String::from(s)}
+    }
+}
+
 macro_rules! chars_while {
     ($s:expr, $($pattern:pat),+ ) => {{
         let mut ends_at = $s.len();
@@ -73,9 +101,8 @@ pub fn read_punctuation(s: &str) -> (Token, &str) {
     (Token{kind: TokenType::Punctuation, text:String::from(&s[..1])}, &s[1..])
 }
 
-pub fn read_number_or_datetime(s: &str) -> (Token, &str) {
-    let (tok,  remainder) = chars_until!(s, ' ', '\t', '\n', '\r', '#', ']', '}');
-    let kind  = if tok.contains('e') || tok.contains('E') {
+fn get_number_or_datetime_kind(tok: &str) -> TokenType {
+    if tok.contains('e') || tok.contains('E') {
         TokenType::Float
     } else if tok.contains('-') && !tok.starts_with('-') {
         TokenType::Datetime
@@ -83,7 +110,12 @@ pub fn read_number_or_datetime(s: &str) -> (Token, &str) {
         TokenType::Float
     } else {
         TokenType::Integer
-    };
+    }
+}
+
+pub fn read_number_or_datetime(s: &str) -> (Token, &str) {
+    let (tok,  remainder) = chars_until!(s, ' ', '\t', '\n', '\r', '#', ']', '}');
+    let kind  = get_number_or_datetime_kind(tok);
     (Token{kind: kind, text:String::from(tok)}, remainder)
 }
 
