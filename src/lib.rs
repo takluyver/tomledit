@@ -2,6 +2,7 @@ extern crate toml;
 
 mod tokenise;
 mod keypath;
+mod tableix;
 
 use std::str::FromStr;
 pub use tokenise::{Token, TokenType, tokenise};
