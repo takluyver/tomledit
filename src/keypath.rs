@@ -1,11 +1,11 @@
 use super::tokenise;
 use super::tokenise::{Token, TokenType};
 
-#[derive(Debug,PartialEq,Clone)]
+#[derive(Debug,PartialEq,Clone,Eq,Hash)]
 pub enum KeyPath {
     Root,
     Key(Box<KeyPath>, String),
-    Ix(Box<KeyPath>, i64),
+    Ix(Box<KeyPath>, usize),
 }
 
 impl KeyPath {
@@ -13,7 +13,7 @@ impl KeyPath {
         KeyPath::Key(Box::new(self.clone()), k)
     }
 
-    pub fn append_index(self, i: i64) -> KeyPath {
+    pub fn append_index(self, i: usize) -> KeyPath {
         KeyPath::Ix(Box::new(self.clone()), i)
     }
 
@@ -55,7 +55,7 @@ impl KeyPath {
                     path = path.append_key(s);
                 }
                 Token{kind: TokenType::Integer, text: s} => {
-                    path = path.append_index(s.parse::<i64>().unwrap());
+                    path = path.append_index(s.parse::<usize>().unwrap());
                 }
                 _ => (),
             };
