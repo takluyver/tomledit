@@ -65,23 +65,21 @@ impl KeyPath {
     }
 }
 
-struct KeyPathPrefixIter {
-    key: KeyPath
+struct KeyPathPrefixIter<'a> {
+    key: &'a KeyPath
 }
 
-impl Iterator for KeyPathPrefixIter {
-    type Item = KeyPath;
+impl<'a> Iterator for KeyPathPrefixIter<'a> {
+    type Item = &'a KeyPath;
 
-    fn next(&mut self) -> Option<KeyPath> {
+    fn next(&mut self) -> Option<&'a KeyPath> {
         use KeyPath::*;
-        match self.key.clone() {
-            Root => None,
-            Key(ref head, _) | Ix(ref head, _) => {
-                let new_key = (**head).clone();
-                self.key = new_key.clone();
-                Some(new_key)
-            }
-        }
+        let next = match self.key {
+            &Root => {return None},
+            &Key(ref head, _) | &Ix(ref head, _) => head
+        };
+        self.key = &*next;
+        Some(&*next)
     }
 }
 
@@ -105,10 +103,10 @@ fn test_keypath_from_string() {
 #[test]
 fn test_keypathprefixiter() {
     let kp = KeyPath::from_string("foo.bar[2].baz");
-    let mut kppi = KeyPathPrefixIter{key: kp};
-    assert_eq!(kppi.next(), Some(KeyPath::from_string("foo.bar[2]")));
-    assert_eq!(kppi.next(), Some(KeyPath::from_string("foo.bar")));
-    assert_eq!(kppi.next(), Some(KeyPath::from_string("foo")));
-    assert_eq!(kppi.next(), Some(KeyPath::Root));
+    let mut kppi = KeyPathPrefixIter{key: &kp};
+    assert_eq!(kppi.next(), Some(&KeyPath::from_string("foo.bar[2]")));
+    assert_eq!(kppi.next(), Some(&KeyPath::from_string("foo.bar")));
+    assert_eq!(kppi.next(), Some(&KeyPath::from_string("foo")));
+    assert_eq!(kppi.next(), Some(&KeyPath::Root));
     assert_eq!(kppi.next(), None);
 }
