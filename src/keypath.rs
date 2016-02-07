@@ -63,9 +63,13 @@ impl KeyPath {
         }
         path
     }
+
+    pub fn parents(&self) -> KeyPathPrefixIter {
+        KeyPathPrefixIter{key: self}
+    }
 }
 
-struct KeyPathPrefixIter<'a> {
+pub struct KeyPathPrefixIter<'a> {
     key: &'a KeyPath
 }
 
@@ -103,7 +107,7 @@ fn test_keypath_from_string() {
 #[test]
 fn test_keypathprefixiter() {
     let kp = KeyPath::from_string("foo.bar[2].baz");
-    let mut kppi = KeyPathPrefixIter{key: &kp};
+    let mut kppi = kp.parents();
     assert_eq!(kppi.next(), Some(&KeyPath::from_string("foo.bar[2]")));
     assert_eq!(kppi.next(), Some(&KeyPath::from_string("foo.bar")));
     assert_eq!(kppi.next(), Some(&KeyPath::from_string("foo")));
