@@ -9,7 +9,7 @@ pub enum KeyPathComponent {
 
 #[derive(Debug,PartialEq,Clone,Eq,Hash)]
 pub struct KeyPath {
-    parts: Vec<KeyPathComponent>
+    pub parts: Vec<KeyPathComponent>
 }
 // pub enum KeyPath {
 //     Root,

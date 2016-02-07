@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::tokenise::{Token, TokenType};
-use super::keypath::KeyPath;
+use super::keypath::{KeyPath, KeyPathComponent};
 
 // use std::boxed::Box;
 
@@ -24,12 +24,25 @@ fn read_table_name(tokens: &Vec<Token>, pos: usize, table_arrays: &mut HashMap<K
         my_pos += 1;
     }
     let name = KeyPath::from_string(&s);
+    let key = {
+        let mut res = KeyPath::new();
+        let (tail, head) = name.parts.split_last().unwrap();
+        for part in head {
+            res.parts.push(part.clone());
+            match table_arrays.get(&res) {
+                None => (),
+                Some(length) => res.parts.push(KeyPathComponent::Ix(length-1))
+            }
+        }
+        res.parts.push(tail.clone());
+        res
+    };
     if table_in_array {
-        let count = table_arrays.entry(name.clone()).or_insert(0);
+        let count = table_arrays.entry(key.clone()).or_insert(0);
         *count += 1;
-        (name.append_index(*count-1), my_pos+2)
+        (key.append_index(*count-1), my_pos+2)
     } else {
-        (name, my_pos+1)
+        (key, my_pos+1)
     }
 }
 
@@ -92,11 +105,16 @@ fn test_find_tables() {
         Token::from("["), Token::from("["), Token::from("arraytable"), Token::from("]"), Token::from("]"),
         Token::from("\n"),
         Token::from("b"), Token::from("="), Token::from("3"),
+        Token::from("\n"),
+        Token::from("["), Token::from("arraytable.sub"), Token::from("]"),
+        Token::from("\n"),
+        Token::from("q"), Token::from("="), Token::from("7"),
     ];
     assert_eq!(find_tables(&inp), vec![
         TablePos{key: KeyPath::new(), start:0, end:4},
         TablePos{key: KeyPath::from_string("table1"), start:7, end:12},
         TablePos{key: KeyPath::from_string("arraytable[0]"), start:17, end:22},
-        TablePos{key: KeyPath::from_string("arraytable[1]"), start:27, end:31},
+        TablePos{key: KeyPath::from_string("arraytable[1]"), start:27, end:32},
+        TablePos{key: KeyPath::from_string("arraytable[1].sub"), start:35, end:39},
     ])
 }
