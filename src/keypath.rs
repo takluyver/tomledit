@@ -65,6 +65,26 @@ impl KeyPath {
     }
 }
 
+struct KeyPathPrefixIter {
+    key: KeyPath
+}
+
+impl Iterator for KeyPathPrefixIter {
+    type Item = KeyPath;
+
+    fn next(&mut self) -> Option<KeyPath> {
+        use KeyPath::*;
+        match self.key.clone() {
+            Root => None,
+            Key(ref head, _) | Ix(ref head, _) => {
+                let new_key = (**head).clone();
+                self.key = new_key.clone();
+                Some(new_key)
+            }
+        }
+    }
+}
+
 
 #[test]
 fn test_stringify_keypath() {
@@ -80,4 +100,15 @@ fn test_keypath_from_string() {
                                 .append_key(String::from("bar"))
                                 .append_index(2);
     assert_eq!(KeyPath::from_string("foo.bar[2]"), expected);
+}
+
+#[test]
+fn test_keypathprefixiter() {
+    let kp = KeyPath::from_string("foo.bar[2].baz");
+    let mut kppi = KeyPathPrefixIter{key: kp};
+    assert_eq!(kppi.next(), Some(KeyPath::from_string("foo.bar[2]")));
+    assert_eq!(kppi.next(), Some(KeyPath::from_string("foo.bar")));
+    assert_eq!(kppi.next(), Some(KeyPath::from_string("foo")));
+    assert_eq!(kppi.next(), Some(KeyPath::Root));
+    assert_eq!(kppi.next(), None);
 }
