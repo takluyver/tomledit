@@ -65,7 +65,7 @@ impl<'a> KeyTokenIter<'a> {
     fn current_keypath(&self) -> KeyPath {
         match self.stack.last() {
             Some(trip) => trip.0.clone(),
-            None => KeyPath::Root
+            None => KeyPath::new(),
         }
     }
 }

@@ -36,7 +36,7 @@ fn read_table_name(tokens: &Vec<Token>, pos: usize, table_arrays: &mut HashMap<K
 pub fn find_tables(tokens: &Vec<Token>) -> Vec<TablePos> {
     let mut res = Vec::new();
     let mut table_arrays = HashMap::new();
-    let mut prev_table = (KeyPath::Root, 0);
+    let mut prev_table = (KeyPath::new(), 0);
     let mut prev_token = &Token::from("."); // Just has to be not '='
     let mut array_depth = 0;
     let mut pos = 0;
@@ -94,7 +94,7 @@ fn test_find_tables() {
         Token::from("b"), Token::from("="), Token::from("3"),
     ];
     assert_eq!(find_tables(&inp), vec![
-        TablePos{key: KeyPath::Root, start:0, end:4},
+        TablePos{key: KeyPath::new(), start:0, end:4},
         TablePos{key: KeyPath::from_string("table1"), start:7, end:12},
         TablePos{key: KeyPath::from_string("arraytable[0]"), start:17, end:22},
         TablePos{key: KeyPath::from_string("arraytable[1]"), start:27, end:31},

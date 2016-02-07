@@ -1,36 +1,63 @@
 use super::tokenise;
 use super::tokenise::{Token, TokenType};
 
-#[derive(Debug,PartialEq,Clone,Eq,Hash)]
-pub enum KeyPath {
-    Root,
-    Key(Box<KeyPath>, String),
-    Ix(Box<KeyPath>, usize),
+#[derive(Debug,PartialEq,Eq,Hash,Clone)]
+pub enum KeyPathComponent {
+    Key(String),
+    Ix(usize),
 }
 
+#[derive(Debug,PartialEq,Clone,Eq,Hash)]
+pub struct KeyPath {
+    parts: Vec<KeyPathComponent>
+}
+// pub enum KeyPath {
+//     Root,
+//     Key(Box<KeyPath>, String),
+//     Ix(Box<KeyPath>, usize),
+// }
+
 impl KeyPath {
+    pub fn new() -> KeyPath {
+        KeyPath{parts: Vec::new()}
+    }
+
     pub fn append_key(self, k: String) -> KeyPath {
-        KeyPath::Key(Box::new(self.clone()), k)
+        // KeyPath::Key(Box::new(self.clone()), k)
+        let mut new = self.clone();
+        new.parts.push(KeyPathComponent::Key(k));
+        new
     }
 
     pub fn append_index(self, i: usize) -> KeyPath {
-        KeyPath::Ix(Box::new(self.clone()), i)
+        //KeyPath::Ix(Box::new(self.clone()), i)
+        let mut new = self.clone();
+        new.parts.push(KeyPathComponent::Ix(i));
+        new
     }
 
     pub fn stringify(&self) -> String {
-        match *self {
-            KeyPath::Root => format!(""),
-            KeyPath::Key(ref head, ref tail) => {
-                format!("{}.{}", head.stringify(), tail)
-            },
-            KeyPath::Ix(ref head, tail) => {
-                format!("{}[{}]", head.stringify(), tail)
+        // match *self {
+        //     KeyPath::Root => format!(""),
+        //     KeyPath::Key(ref head, ref tail) => {
+        //         format!("{}.{}", head.stringify(), tail)
+        //     },
+        //     KeyPath::Ix(ref head, tail) => {
+        //         format!("{}[{}]", head.stringify(), tail)
+        //     }
+        // }
+        let mut res = String::new();
+        for ref p in &self.parts {
+            match *p {
+                &KeyPathComponent::Key(ref s) => res.push_str(&format!(".{}", s)),
+                &KeyPathComponent::Ix(ref i) => res.push_str(&format!("[{}]", i))
             }
         }
+        res
     }
 
     pub fn from_string(s: &str) -> KeyPath {
-        let mut path = KeyPath::Root;
+        let mut path = KeyPath::new();
         let mut remainder = s;
         loop {
             let next_char = remainder.chars().next();
@@ -52,10 +79,12 @@ impl KeyPath {
             };
             match next_token {
                 Token{kind: TokenType::BareKey, text: s} => {
-                    path = path.append_key(s);
+                    path.parts.push(KeyPathComponent::Key(s));
+                    // path = path.append_key(s);
                 }
                 Token{kind: TokenType::Integer, text: s} => {
-                    path = path.append_index(s.parse::<usize>().unwrap());
+                    path.parts.push(KeyPathComponent::Ix(s.parse::<usize>().unwrap()));
+                    // path = path.append_index(s.parse::<usize>().unwrap());
                 }
                 _ => (),
             };
@@ -63,34 +92,12 @@ impl KeyPath {
         }
         path
     }
-
-    pub fn parents(&self) -> KeyPathPrefixIter {
-        KeyPathPrefixIter{key: self}
-    }
-}
-
-pub struct KeyPathPrefixIter<'a> {
-    key: &'a KeyPath
-}
-
-impl<'a> Iterator for KeyPathPrefixIter<'a> {
-    type Item = &'a KeyPath;
-
-    fn next(&mut self) -> Option<&'a KeyPath> {
-        use KeyPath::*;
-        let next = match self.key {
-            &Root => {return None},
-            &Key(ref head, _) | &Ix(ref head, _) => head
-        };
-        self.key = next;
-        Some(next)
-    }
 }
 
 
 #[test]
 fn test_stringify_keypath() {
-    let kp = KeyPath::Root.append_key(String::from("foo")).append_index(2);
+    let kp = KeyPath::new().append_key(String::from("foo")).append_index(2);
     assert_eq!(kp.stringify(), String::from(".foo[2]"))
 }
 
@@ -98,19 +105,8 @@ fn test_stringify_keypath() {
 fn test_keypath_from_string() {
     let s = "1";
     assert_eq!(&s[1..], "");
-    let expected = KeyPath::Root.append_key(String::from("foo"))
+    let expected = KeyPath::new().append_key(String::from("foo"))
                                 .append_key(String::from("bar"))
                                 .append_index(2);
     assert_eq!(KeyPath::from_string("foo.bar[2]"), expected);
-}
-
-#[test]
-fn test_keypathprefixiter() {
-    let kp = KeyPath::from_string("foo.bar[2].baz");
-    let mut kppi = kp.parents();
-    assert_eq!(kppi.next(), Some(&KeyPath::from_string("foo.bar[2]")));
-    assert_eq!(kppi.next(), Some(&KeyPath::from_string("foo.bar")));
-    assert_eq!(kppi.next(), Some(&KeyPath::from_string("foo")));
-    assert_eq!(kppi.next(), Some(&KeyPath::Root));
-    assert_eq!(kppi.next(), None);
 }
