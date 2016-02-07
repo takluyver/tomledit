@@ -78,8 +78,8 @@ impl<'a> Iterator for KeyPathPrefixIter<'a> {
             &Root => {return None},
             &Key(ref head, _) | &Ix(ref head, _) => head
         };
-        self.key = &*next;
-        Some(&*next)
+        self.key = next;
+        Some(next)
     }
 }
 
