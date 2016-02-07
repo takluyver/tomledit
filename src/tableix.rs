@@ -1,6 +1,8 @@
+extern crate toml;
+
 use std::collections::HashMap;
 
-use super::tokenise::{Token, TokenType};
+use super::tokenise::{Token, TokenType, tokenise};
 use super::keypath::{KeyPath, KeyPathComponent};
 
 // use std::boxed::Box;
@@ -89,6 +91,62 @@ pub fn find_tables(tokens: &Vec<Token>) -> Vec<TablePos> {
     res
 }
 
+pub fn find_table(tokens: &Vec<Token>, key: &KeyPath) -> Option<TablePos> {
+    for candidate in find_tables(tokens) {
+        if candidate.key == *key {
+            return Some(candidate)
+        }
+    }
+    None
+}
+
+fn make_key_token(key: &str) -> Token {
+    if key.chars().any(|c| { match c {
+        'a'...'z' | 'A'...'Z' | '-' | '_' => false,
+        _ => true
+    }}) {
+        // Key needs quoting
+        let val = toml::Value::String(String::from(key));
+        Token{kind: TokenType::BasicString, text: val.to_string()}
+    } else {
+        // Bare key
+        Token{kind: TokenType::BareKey, text: String::from(key)}
+    }
+}
+
+pub fn insert_kv(tokens: &Vec<Token>, key: &KeyPath, value: toml::Value) -> Vec<Token> {
+    let table_pos = find_table(tokens, &key.parent().unwrap()).unwrap();
+    // Find insertion point
+    let mut pos = table_pos.end - 1;
+    while pos >= table_pos.start && (tokens[pos].kind == TokenType::Whitespace ||
+                                     tokens[pos].kind == TokenType::Newline) {
+        pos -= 1;
+    }
+    pos += 1; // Cut just after the non-whitespace token we found
+
+    let mut res = Vec::new();
+    // Copy tokens before insertion point
+    for tok in &tokens[..pos] {
+        res.push((*tok).clone());
+    }
+    // Insert new key-value pair
+    res.push(Token::from("\n"));
+    let key_tail = match key.parts.last().unwrap() {
+        &KeyPathComponent::Key(ref s) => s,
+        _ => panic!("Key must end with a string part")
+    };
+    res.push(make_key_token(&key_tail));
+    for tok in [" ", "=", " "].iter() {
+        res.push(Token::from(tok));
+    }
+    res.push(Token::from(&value.to_string()));
+    // Copy tokens after insertion point
+    for tok in &tokens[pos..] {
+        res.push((*tok).clone());
+    }
+    res
+}
+
 #[test]
 fn test_find_tables() {
     let inp = vec![
@@ -117,4 +175,37 @@ fn test_find_tables() {
         TablePos{key: KeyPath::from_string("arraytable[1]"), start:27, end:32},
         TablePos{key: KeyPath::from_string("arraytable[1].sub"), start:35, end:39},
     ])
+}
+
+#[test]
+fn test_make_key_token() {
+    assert_eq!(make_key_token("a_b"), Token{kind: TokenType::BareKey, text: String::from("a_b")});
+    assert_eq!(make_key_token("a b"), Token{kind: TokenType::BasicString, text: String::from(r#""a b""#)});
+}
+
+#[test]
+fn test_insert_kv() {
+let inp = "\
+[foo]
+# a comment
+a = 1 #?
+
+[bar]
+b = 2
+";
+let exp = "\
+[foo]
+# a comment
+a = 1 #?
+c = 3
+
+[bar]
+b = 2
+";
+    let tokens = tokenise(inp);
+    let mut res = String::new();
+    for tok in insert_kv(&tokens, &KeyPath::from_string("foo.c"), toml::Value::Integer(3)) {
+        res.push_str(&tok.text);
+    }
+    assert_eq!(res, exp);
 }

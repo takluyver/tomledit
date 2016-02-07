@@ -36,6 +36,13 @@ impl KeyPath {
         new
     }
 
+    pub fn parent(&self) -> Option<KeyPath> {
+        match self.parts.split_last() {
+            None => None,
+            Some((_, head)) => Some(KeyPath{parts: Vec::from(head)})
+        }
+    }
+
     pub fn stringify(&self) -> String {
         // match *self {
         //     KeyPath::Root => format!(""),
